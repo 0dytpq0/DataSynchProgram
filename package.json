@@ -1,0 +1,27 @@
+{
+  "name": "nodesynch",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "childprocess": "^2.0.2",
+    "dayjs": "^1.11.7",
+    "jszip": "^3.10.1",
+    "jzip": "^1.0.0",
+    "moment": "^2.29.4",
+    "moment-timezone": "^0.5.43",
+    "mysql2": "^3.2.0",
+    "node-schedule": "^2.1.1",
+    "nodemon": "^2.0.22"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.21.4",
+    "@babel/node": "^7.20.7",
+    "@babel/preset-env": "^7.21.4"
+  }
+}
