@@ -261,12 +261,12 @@ const Main = async () => {
     password: 'ekdnsel',
     database: 'information_schema',
   });
-  const getColumnNames = (columns, dataInfo) =>
+  const getColumnNames = (columns) =>
     columns.map((column) => column.COLUMN_NAME);
 
   //synch 데이터를 가져옵니다.
   const [synchRows] = await localConnection.execute(
-    'SELECT * FROM dw_synch LIMIT 100'
+    'SELECT * FROM dw_synch LIMIT 10'
   );
   let filteredData;
   let dataInfo = [];
@@ -274,65 +274,193 @@ const Main = async () => {
     for (let item of dbOriginData) {
       filteredData = synchRows.filter((x) => item.table === x.tableNm);
       //table name이 같으닊 ㅏ이제 db에서 테이블 name이 같은 것들중에 key값이 같은게 있는지 체크해야함.
+
       if (filteredData.length > 0) {
-        dataInfo = await localConnection.execute(
-          `SELECT * FROM ${item.table} WHERE ${item.key} = ${Number(
-            filteredData[0].tableKey1
-          )}`
-
-          //여기서 이제 컬럼을 뽑아내서 그 컬럼들에 맞는 값을 넣어주는 것이겠지?
-        );
-        let tableColumns = await schemaConnection.execute(
-          `SELECT COLUMN_NAME FROM COLUMNS WHERE TABLE_NAME='${item.table}' and table_schema='dawoon' ORDER BY ordinal_position ASC;`
-        );
-        const columnNames = getColumnNames(tableColumns[0], dataInfo[0][0]);
-
-        const columnNamesString = columnNames.join(', ');
-        const valuesString = columnNames
-          .map((name) => {
-            const value = dataInfo[0][0][name];
-            if (typeof value === 'string') {
-              return `'${value}'`;
-            } else if (value instanceof Date) {
-              return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
-            } else {
-              return value;
-            }
-          })
-          .join(', ');
-
-        await dx_9999Connection.execute(
-          `INSERT INTO ${item.table} (${columnNamesString}) VALUES (${valuesString})`
-        );
+        //         //filteredData에 값들이 많으니 반복문을 돌려서 tableKey1과 item.key가 같은 것들을 배열로 뽑아내야한다.
+        let instantArr = [];
+        for (const data of filteredData) {
+          const result = await localConnection.execute(
+            `SELECT * FROM ${item.table} WHERE ${item.key} = ${Number(
+              data.tableKey1
+            )}`
+          );
+          instantArr.push(result[0]);
+        }
+        dataInfo = [...instantArr];
+        //이제 dataInfo만큼 돌려서 값을 넣어주면 된다.
+        // console.log('dataInfo', dataInfo[0]);
+        for (const data of dataInfo) {
+          console.log('item', item.table);
+          let result;
+          const tableColumns = await schemaConnection.execute(
+            `SELECT COLUMN_NAME FROM COLUMNS WHERE TABLE_NAME='${item.table}' and table_schema='dawoon' ORDER BY ordinal_position ASC;`
+          );
+          const columnNames = await getColumnNames(tableColumns[0]);
+          const columnNamesString = await columnNames.join(',');
+          const valuesString = await Promise.all(
+            columnNames.map(async (name) => {
+              console.log('data', data);
+              const value = data[0][name];
+              if (typeof value === 'string') {
+                return `'${value}'`;
+              } else if (value instanceof Date) {
+                return `'${value.toISOString().slice(0, 19).replace('T', '')}'`;
+              } else {
+                return value;
+              }
+            })
+          );
+          console.log('valuesString', valuesString);
+          const joinedValuesString = valuesString.join(', ');
+          console.log('joinedValuesString', joinedValuesString);
+          await dx_9999Connection.execute(
+            `REPLACE INTO ${item.table}(${columnNamesString}) VALUES(${joinedValuesString})`
+          );
+        }
       }
     }
   })();
-
-  let promises = synchRows.map(async (item) => {
-    try {
-      let getTableData = await localConnection.execute(
-        `SELECT moveSeq FROM ${item.tableNm} LIMIT 10`
-      );
-      // await dx_9999Connection.execute(
-      //   `INSERT INTO dw_synch_backup (synchSeq, tableNm, tableKey1, tableKey2, issueDate, applyFlag, applyDate, checkFlag, checkDate) VALUES (${item.synchSeq}, '${item.tableNm}', ${item.tableKey1}, 1, NOW(), '${item.applyFlag}', ${item.applyDate}, '${item.checkFlag}', ${item.checkDate})`
-      // );
-    } catch (err) {
-      // await dx_9999Connection.execute(
-      //   `INSERT INTO dw_synch_backup (synchSeq, tableNm, tableKey1, tableKey2, issueDate, applyFlag, applyDate, checkFlag, checkDate) VALUES (${item.synchSeq}, '${item.tableNm}', ${item.tableKey1}, 1, NOW(), '${item.applyFlag}', ${item.applyDate}, '${item.checkFlag}', ${item.checkDate})`
-      // );
-    }
-    let data = await Promise.all(promises);
-
-    // const [result] = await dx_9999Connection.execute('CALL sp_animal(?)',[synchRows])
-  });
-
-  //   카이트 서버에 연결
-  // console.log('rows', synchRows);
-  // const kiteDwConnection = await connectToMysql({
-  //   host: '',
-  // });
-  // const kiteDxConnection = await connectToMysql({
-  //   host: '',
-  // });
 };
+
 Main();
+
+// const Main = async () => {
+//   const localConnection = await connectToMysql({
+//     host: 'localhost',
+//     user: 'root',
+//     password: 'ekdnsel',
+//     database: 'dawoon',
+//   });
+//   const dx_9999Connection = await connectToMysql({
+//     host: 'localhost',
+//     user: 'root',
+//     password: 'ekdnsel',
+//     database: 'dx_9999',
+//   });
+//   const schemaConnection = await connectToMysql({
+//     host: 'localhost',
+//     user: 'root',
+//     password: 'ekdnsel',
+//     database: 'information_schema',
+//   });
+//   const getColumnNames = (columns, dataInfo) =>
+//     columns.map((column) => column.COLUMN_NAME);
+
+//   //synch 데이터를 가져옵니다.
+//   const [synchRows] = await localConnection.execute(
+//     'SELECT * FROM dw_synch LIMIT 100'
+//   );
+//   let filteredData;
+//   let dataInfo = [];
+//   (async () => {
+//     for (let item of dbOriginData) {
+//       filteredData = synchRows.filter((x) => item.table === x.tableNm);
+//       //table name이 같으닊 ㅏ이제 db에서 테이블 name이 같은 것들중에 key값이 같은게 있는지 체크해야함.
+
+//       if (filteredData.length > 0) {
+//         //filteredData에 값들이 많으니 반복문을 돌려서 tableKey1과 item.key가 같은 것들을 배열로 뽑아내야한다.
+//         let instantArr = [];
+//         for (const data of filteredData) {
+//           const result = await localConnection.execute(
+//             `SELECT * FROM ${item.table} WHERE ${item.key} = ${Number(
+//               data.tableKey1
+//             )}`
+//           );
+//           instantArr.push(...result);
+//         }
+//         dataInfo = [...instantArr];
+//         //이제 dataInfo만큼 돌려서 값을 넣어주면 된다.
+//         // console.log('dataInfo', dataInfo[0]);
+
+//         for (const data of dataInfo) {
+//           let result;
+//           let tableColumns = await schemaConnection.execute(
+//             `SELECT COLUMN_NAME FROM COLUMNS WHERE TABLE_NAME='${item.table}' and table_schema='dawoon' ORDER BY ordinal_position ASC;`
+//           );
+//           console.log('data', data[0]);
+//           const columnNames = await getColumnNames(tableColumns[0], data[0]);
+//           const columnNamesString = await columnNames.join(', ');
+//           console.log('columnNames', columnNames);
+//           const valuesString = await Promise.all(
+//             columnNames.map(async (name) => {
+//               const value = data[0][name];
+//               if (typeof value === 'string') {
+//                 return `'${value}'`;
+//               } else if (value instanceof Date) {
+//                 return `'${value
+//                   .toISOString()
+//                   .slice(0, 19)
+//                   .replace('T', ' ')}'`;
+//               } else {
+//                 return value;
+//               }
+//             })
+//           );
+//           const joinedValuesString = valuesString.join(', ');
+//           console.log('valueString', valuesString);
+//           await dx_9999Connection.execute(
+//             `REPLACE INTO ${item.table}(${columnNamesString}) VALUES(${joinedValuesString})`
+//           );
+//         }
+
+//       }
+//     }
+//   })();
+// dataInfo = await localConnection.execute(
+//   `SELECT * FROM ${item.table} WHERE ${item.key} = ${Number(
+//     filteredData[0].tableKey1
+//   )}`
+
+//   //여기서 이제 컬럼을 뽑아내서 그 컬럼들에 맞는 값을 넣어주는 것이겠지?
+// );
+// let tableColumns = await schemaConnection.execute(
+//   `SELECT COLUMN_NAME FROM COLUMNS WHERE TABLE_NAME='${item.table}' and table_schema='dawoon' ORDER BY ordinal_position ASC;`
+// );
+// const columnNames = getColumnNames(tableColumns[0], dataInfo[0][0]);
+
+// const columnNamesString = columnNames.join(', ');
+// const valuesString = columnNames
+//   .map((name) => {
+//     const value = dataInfo[0][0][name];
+//     if (typeof value === 'string') {
+//       return `'${value}'`;
+//     } else if (value instanceof Date) {
+//       return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
+//     } else {
+//       return value;
+//     }
+//   })
+//   .join(', ');
+
+// await dx_9999Connection.execute(
+//   `INSERT INTO ${item.table} (${columnNamesString}) VALUES (${valuesString})`
+// );
+
+// let promises = synchRows.map(async (item) => {
+//   try {
+//     let getTableData = await localConnection.execute(
+//       `SELECT moveSeq FROM ${item.tableNm} LIMIT 10`
+//     );
+//     // await dx_9999Connection.execute(
+//     //   `INSERT INTO dw_synch_backup (synchSeq, tableNm, tableKey1, tableKey2, issueDate, applyFlag, applyDate, checkFlag, checkDate) VALUES (${item.synchSeq}, '${item.tableNm}', ${item.tableKey1}, 1, NOW(), '${item.applyFlag}', ${item.applyDate}, '${item.checkFlag}', ${item.checkDate})`
+//     // );
+//   } catch (err) {
+//     // await dx_9999Connection.execute(
+//     //   `INSERT INTO dw_synch_backup (synchSeq, tableNm, tableKey1, tableKey2, issueDate, applyFlag, applyDate, checkFlag, checkDate) VALUES (${item.synchSeq}, '${item.tableNm}', ${item.tableKey1}, 1, NOW(), '${item.applyFlag}', ${item.applyDate}, '${item.checkFlag}', ${item.checkDate})`
+//     // );
+//   }
+//   let data = await Promise.all(promises);
+
+// const [result] = await dx_9999Connection.execute('CALL sp_animal(?)',[synchRows])
+// });
+
+//   카이트 서버에 연결
+// console.log('rows', synchRows);
+// const kiteDwConnection = await connectToMysql({
+//   host: '',
+// });
+// const kiteDxConnection = await connectToMysql({
+//   host: '',
+// });
+// };
+// Main();
