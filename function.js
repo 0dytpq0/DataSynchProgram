@@ -1,3 +1,16 @@
+const { connectToMysql } = require('./index');
+const {
+  spDwAnimals,
+  spDwHistory,
+  spDwFeedMove,
+  spDwFeedMoveRobot,
+  spDwIndoor,
+  spDwMilking,
+  spDwWater,
+  spClDwFeedMoverRobot,
+} = require('./procedure');
+const mysql = require('mysql2/promise');
+
 const getColumnType = (columns) => {
   let columnType = [];
   columnType = columns.filter(
@@ -8,7 +21,7 @@ const getColumnType = (columns) => {
   return columnType;
 };
 
-const getColumnNames = (columns, table) => {
+const getColumnNames = (columns, table, isDw) => {
   let filteredColumns;
   table !== 'dw_manager' &&
   table !== 'dw_milking_config' &&
@@ -21,7 +34,9 @@ const getColumnNames = (columns, table) => {
   table !== 'dw_milking_report5' &&
   table !== 'dw_milking_report6' &&
   table !== 'dw_milking_report8' &&
-  table !== 'dw_milking_report9'
+  table !== 'dw_milking_report9' &&
+  table !== 'dw_breeding' &&
+  isDw === 'no'
     ? (filteredColumns = columns.filter(
         (column) =>
           column.COLUMN_NAME !== 'regDate' &&
@@ -29,7 +44,7 @@ const getColumnNames = (columns, table) => {
           column.COLUMN_NAME !== 'feedSeq'
       ))
     : (filteredColumns = columns);
-  if (table === 'dw_animals') {
+  if (table === 'dw_animals' && isDw === 'no') {
     filteredColumns = filteredColumns.filter(
       (column) =>
         column.COLUMN_NAME !== 'buyCost' && column.COLUMN_NAME !== 'aniType'
@@ -44,17 +59,28 @@ const getColumnNames = (columns, table) => {
     );
   }
   if (table === 'dw_feed_move_robot') {
-    filteredColumns = filteredColumns.filter(
-      (column) =>
-        column.COLUMN_NAME !== 'aniSeq' &&
-        column.COLUMN_NAME !== 'stdTime' &&
-        column.COLUMN_NAME !== 'aniFeedSet1' &&
-        column.COLUMN_NAME !== 'aniFeedSet2' &&
-        column.COLUMN_NAME !== 'aniFeedSet3' &&
-        column.COLUMN_NAME !== 'aniFeedSet4' &&
-        column.COLUMN_NAME !== 'aniFeedSet5' &&
-        column.COLUMN_NAME !== 'feedCd'
-    );
+    if (isDw === 'yes') {
+      filteredColumns = filteredColumns.filter(
+        (column) =>
+          column.COLUMN_NAME !== 'aniFeedSet1' &&
+          column.COLUMN_NAME !== 'aniFeedSet2' &&
+          column.COLUMN_NAME !== 'aniFeedSet3' &&
+          column.COLUMN_NAME !== 'aniFeedSet4' &&
+          column.COLUMN_NAME !== 'aniFeedSet5'
+      );
+    } else {
+      filteredColumns = filteredColumns.filter(
+        (column) =>
+          column.COLUMN_NAME !== 'aniSeq' &&
+          column.COLUMN_NAME !== 'stdTime' &&
+          column.COLUMN_NAME !== 'aniFeedSet1' &&
+          column.COLUMN_NAME !== 'aniFeedSet2' &&
+          column.COLUMN_NAME !== 'aniFeedSet3' &&
+          column.COLUMN_NAME !== 'aniFeedSet4' &&
+          column.COLUMN_NAME !== 'aniFeedSet5' &&
+          column.COLUMN_NAME !== 'feedCd'
+      );
+    }
   }
   if (table === 'dw_indoor') {
     filteredColumns = filteredColumns.filter(

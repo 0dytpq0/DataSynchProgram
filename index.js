@@ -11,6 +11,7 @@ const {
   spDwIndoor,
   spDwMilking,
   spDwWater,
+  spClDwFeedMoverRobot,
 } = require('./procedure');
 
 connectToMysql = async ({ host, user, password, database }) => {
@@ -43,134 +44,181 @@ const Main = async () => {
     password: 'ekdnsel',
     database: 'dx_9999',
   });
+  const dw_3974Connection = await connectToMysql({
+    host: 'localhost',
+    user: 'root',
+    password: 'ekdnsel',
+    database: 'dw_3974',
+  });
   const schemaConnection = await connectToMysql({
     host: 'localhost',
     user: 'root',
     password: 'ekdnsel',
     database: 'information_schema',
   });
+  const callProcedureDX = async (tableNm, tableKey) => {
+    let procedureName = 'sp_' + tableNm.slice(3);
+    if (tableNm === 'dw_daily_feed_robot') {
+      procedureName = 'sp_' + tableNm.slice(3, -5) + 'Robot';
+    }
+    if (
+      tableNm === 'dw_milking_feed' ||
+      tableNm === 'dw_breeding' ||
+      tableNm === 'dw_biu' ||
+      tableNm === 'dw_smslog_SP' ||
+      tableNm === 'dw_rumination'
+    ) {
+      procedureName = tableNm + '_SP';
+    }
+    if (
+      tableNm === 'dw_milking_report1' ||
+      tableNm === 'dw_milking_report2' ||
+      tableNm === 'dw_milking_report3' ||
+      tableNm === 'dw_milking_report4' ||
+      tableNm === 'dw_milking_report5' ||
+      tableNm === 'dw_milking_report6' ||
+      tableNm === 'dw_milking_report8' ||
+      tableNm === 'dw_milking_report9'
+    ) {
+      procedureName = tableNm + '_SP';
+    }
 
-  //synch 데이터를 가져옵니다.
-  let procedureName = '';
-  const [synchRows] = await localConnection.execute(
-    'SELECT * FROM dw_synch where tableNm = "dw_water"  LIMIT 10'
-  );
-  console.log('synchRows.length', synchRows.length);
-  let filteredData;
-  let dataInfo = [];
-  (async () => {
-    for (let item of dbOriginData) {
-      filteredData = synchRows.filter((x) => item.table === x.tableNm);
+    let procedureNameDw = 'sp_cl_' + tableNm.slice(3);
+    //moveSeq를 어떤 변수를 넣어야 될까?
 
-      //table name이 같으닊 ㅏ이제 db에서 테이블 name이 같은 것들중에 key값이 같은게 있는지 체크해야함.
-      if (filteredData.length > 0) {
-        console.log('item.table,item.key', item.table, item.key);
-        //         //filteredData에 값들이 많으니 반복문을 돌려서 tableKey1과 item.key가 같은 것들을 배열로 뽑아내야한다.
-        let instantArr = [];
-        procedureName = 'sp_' + item.table.slice(3);
-        if (item.table === 'dw_daily_feed_robot') {
-          procedureName = 'sp_' + item.table.slice(3, -5) + 'Robot';
-        }
-        if (item.table === 'dw_milking_feed') {
-          procedureName = item.table + '_SP';
-        }
-        if (
-          item.table === 'dw_milking_report1' ||
-          item.table === 'dw_milking_report2' ||
-          item.table === 'dw_milking_report3' ||
-          item.table === 'dw_milking_report4' ||
-          item.table === 'dw_milking_report5' ||
-          item.table === 'dw_milking_report6' ||
-          item.table === 'dw_milking_report8' ||
-          item.table === 'dw_milking_report9'
-        ) {
-          procedureName = item.table + '_SP';
-        }
-        for (const data of filteredData) {
-          const result = await localConnection.execute(
-            `SELECT * FROM ${item.table} WHERE ${item.key} = ${Number(
-              data.tableKey1
-            )}`
-          );
-          result[0].length > 0 ? instantArr.push(result[0]) : null;
-        }
-        dataInfo = [...instantArr];
-        //이제 dataInfo만큼 돌려서 값을 넣어주면 된다.
-        console.log('dataInfo.length', dataInfo.length);
-        if (dataInfo.length) {
-          for (const data of dataInfo) {
-            let result;
-            const tableColumns = await schemaConnection.execute(
-              `SELECT COLUMN_NAME,DATA_TYPE FROM COLUMNS WHERE TABLE_NAME='${item.table}' and table_schema='dawoon' ORDER BY ordinal_position ASC;`
-            );
-            const columnNames = await getColumnNames(
-              tableColumns[0],
-              item.table
-            );
-            const columnTypes = await getColumnType(tableColumns[0]);
-            const columnNamesString = await columnNames.join(',');
-            let valuesString = await Promise.all(
-              columnNames.map(async (name) => {
-                let value = data[0][name];
+    const tableColumns = await schemaConnection.execute(
+      `SELECT COLUMN_NAME,DATA_TYPE FROM COLUMNS WHERE TABLE_NAME='${tableNm}' and table_schema='dawoon' ORDER BY ordinal_position ASC;`
+    );
+    //dx_9999 columnNames 구함
+    const columnNames = await getColumnNames(tableColumns[0], tableNm, 'no');
 
-                if (columnTypes.includes(name)) {
-                  value = Number(value);
-                }
+    const columnTypes = await getColumnType(tableColumns[0]);
 
-                if (typeof value === 'string') {
-                  return `'${value}'`;
-                } else if (value instanceof Date) {
-                  return `'${value
-                    .toISOString()
-                    .slice(0, 19)
-                    .replace('T', '')}'`;
-                } else {
-                  return value;
-                }
-              })
-            );
-            if (item.table === 'dw_animals') {
-              valuesString = await spDwAnimals(valuesString);
-            } else if (item.table === 'dw_history') {
-              valuesString = await spDwHistory(valuesString);
-            } else if (item.table === 'dw_feed_move') {
-              valuesString = await spDwFeedMove(valuesString);
-            } else if (item.table === 'dw_feed_move_robot') {
-              valuesString = await spDwFeedMoveRobot(valuesString);
-            } else if (item.table === 'dw_indoor') {
-              valuesString = await spDwIndoor(valuesString);
-            } else if (item.table === 'dw_milking') {
-              valuesString = await spDwMilking(valuesString);
-            } else if (item.table === 'dw_water') {
-              valuesString = await spDwWater(valuesString);
-            }
+    const data = await localConnection.execute(
+      `SELECT * FROM ${tableNm} WHERE ${tableKey} = ${tableColumns[0][0].COLUMN_NAME}`
+    );
+    console.log('data[0]', tableKey, tableColumns[0][0].COLUMN_NAME);
 
-            const joinedValuesString = valuesString.join(', ');
-            if (item.table === 'dw_test') {
-              await dx_9999Connection.execute(`CALL ${procedureName}`);
-            } else {
-              await dx_9999Connection.execute(
-                `CALL ${procedureName}(${joinedValuesString})`
-              );
-            }
+    let valuesString;
+    try {
+      valuesString = await Promise.all(
+        columnNames.map(async (name) => {
+          let value = data[0][0][name];
+          if (columnTypes.includes(name)) {
+            value = Number(value);
           }
-        }
+
+          if (typeof value === 'string') {
+            return `'${value}'`;
+          } else if (value instanceof Date) {
+            return `'${value.toISOString().slice(0, 19).replace('T', '')}'`;
+          } else {
+            return value;
+          }
+        })
+      );
+
+      //procedure에 넣을 params 순서맞춤.
+      if (tableNm === 'dw_animals') {
+        valuesString = await spDwAnimals(valuesString);
+      } else if (tableNm === 'dw_history') {
+        valuesString = await spDwHistory(valuesString);
+      } else if (tableNm === 'dw_feed_move') {
+        valuesString = await spDwFeedMove(valuesString);
+      } else if (tableNm === 'dw_feed_move_robot') {
+        valuesString = await spDwFeedMoveRobot(valuesString);
+      } else if (tableNm === 'dw_indoor') {
+        valuesString = await spDwIndoor(valuesString);
+      } else if (tableNm === 'dw_milking') {
+        valuesString = await spDwMilking(valuesString);
+      } else if (tableNm === 'dw_water') {
+        valuesString = await spDwWater(valuesString);
       }
-      // await synchRows.map(async (item) => {
-      //   await localConnection.execute(
-      //     `INSERT INTO dw_synch_backup (synchSeq, tableNm, tableKey1, tableKey2, issueDate,
-      //       applyFlag, applyDate, checkFlag, checkDate) VALUES (${item.synchSeq},  '${item.tableNm}', '${item.tableKey1}','1', NOW(), '${item.applyFlag}'
-      //       , ${item.applyDate}, '${item.checkFlag}',  ${item.checkDate})`
-      //   );
-      // });
+
+      let joinedValuesString = valuesString.join(', ');
+      await dx_9999Connection.execute(
+        `CALL ${procedureName}(${joinedValuesString})`
+      );
+    } catch (error) {
+      console.log('error', error);
+    }
+  };
+  const callProcedureDW = async (tableNm, tableKey) => {
+    let procedureName = 'sp_cl_' + tableNm.slice(3);
+    //moveSeq를 어떤 변수를 넣어야 될까?
+
+    const tableColumns = await schemaConnection.execute(
+      `SELECT COLUMN_NAME,DATA_TYPE FROM COLUMNS WHERE TABLE_NAME='${tableNm}' and table_schema='dawoon' ORDER BY ordinal_position ASC;`
+    );
+    //dx_9999 columnNames 구함
+    const columnNames = await getColumnNames(tableColumns[0], tableNm, 'yes');
+    const columnTypes = await getColumnType(tableColumns[0]);
+    const data = await localConnection.execute(
+      `SELECT * FROM ${tableNm} WHERE ${tableKey} = ${tableColumns[0][0].COLUMN_NAME}`
+    );
+    let valuesString;
+    try {
+      valuesString = await Promise.all(
+        columnNames.map(async (name) => {
+          let value = data[0][0][name];
+          if (columnTypes.includes(name)) {
+            value = Number(value);
+          }
+
+          if (typeof value === 'string') {
+            return `'${value}'`;
+          } else if (value instanceof Date) {
+            return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
+          } else {
+            return value;
+          }
+        })
+      );
+
+      //procedure에 넣을 params 순서맞춤.
+      if (tableNm === 'dw_feed_move_robot') {
+        valuesString = await spClDwFeedMoverRobot(valuesString);
+        procedureName = 'sp_cl_feed_move';
+      }
+
+      let joinedValuesString = valuesString.join(', ');
+      //dw_3974에 넣을 columnNames 구함 3번째 params가 그에 관한 것임
+      await dw_3974Connection.execute(
+        `CALL ${procedureName}(${joinedValuesString})`
+      );
+    } catch (error) {
+      console.log('error', error);
+    }
+  };
+
+  // where tableNm = "dw_device_config"
+  //synch 데이터를 가져옵니다.
+  //1 synch에서 데이터를 가져온다.
+  while (true) {
+    const [synchRows] = await localConnection.execute(
+      'SELECT * FROM dw_synch where tableNm = "dw_animals" LIMIT 3'
+    );
+    console.log('synchRows.length', synchRows.length);
+
+    for (let item of synchRows) {
+      //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
+      callProcedureDX(item.tableNm, item.tableKey1);
+      // callProcedureDW(item.tableNm, item.tableKey1);
       // await localConnection.execute(
-      //   'DELETE FROM dw_synch WHERE tableNm = "dw_animals" LIMIT 5'
+      //   `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
+      // );
+      // await localConnection.execute('DELETE FROM dw_synch LIMIT 100 ');
+
+      // await localConnection.execute(
+      //   `CALL sp_Synch('${item.tableNm}','${item.tableKey1}','${item.tableKey2}','${item.applyFlag}','${item.checkFlag}',${item.synchSeq}
+      //   )`
       // );
     }
-  })();
-  // await localConnection.execute(
-  //   'SELECT * FROM dw_synch where tableNm = "dw_animals"  LIMIT 5'
-  // );
+    if (synchRows.length < 100) {
+      console.log('모든 작업을 마쳤습니다.');
+      break;
+    }
+  }
 };
 
 Main();

@@ -1,8 +1,9 @@
 const spDwAnimals = (data) => {
   const aniSeq = data[0];
   const animalsArr = data.splice(1);
+  const output = 'Insert OK';
   animalsArr.push(aniSeq);
-  animalsArr.push('');
+  animalsArr.push(`'${output}'`);
   return animalsArr;
 };
 const spDwHistory = (data) => {
@@ -26,6 +27,14 @@ const spDwFeedMoveRobot = async (data) => {
   await moveRobotArr.push(moveSeq);
   return moveRobotArr;
 };
+const spClDwFeedMoverRobot = async (data) => {
+  const moveRobotArrBack = data.splice(-4);
+  const moveRobotArrFront = data.splice(0, 16);
+  moveRobotArrFront.push(...moveRobotArrBack);
+  // const result = moveRobotArrFront + ',' + moveRobotArrBack;
+  console.log('moveRobotArrFront', moveRobotArrFront);
+  return moveRobotArrFront;
+};
 const spDwIndoor = (data) => {
   const cmd = data[0];
   let indoorArr = data.splice(2);
@@ -48,6 +57,7 @@ const spDwWater = (data) => {
   waterArr.push(aniRFID);
   return waterArr;
 };
+
 module.exports = {
   spDwAnimals,
   spDwHistory,
@@ -56,4 +66,5 @@ module.exports = {
   spDwIndoor,
   spDwMilking,
   spDwWater,
+  spClDwFeedMoverRobot,
 };
