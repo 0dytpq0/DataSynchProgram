@@ -17,6 +17,7 @@ const {
   spDwWater,
   spClDwFeedMoverRobot,
   spDwBreeding,
+  spDeviceConfig,
 } = require('./procedure');
 
 //Sql서버에 접속하는 함수
@@ -83,10 +84,18 @@ const Main = async () => {
       tableNm === 'dw_milking_report5' ||
       tableNm === 'dw_milking_report6' ||
       tableNm === 'dw_milking_report8' ||
-      tableNm === 'dw_milking_report9'
+      tableNm === 'dw_milking_report9' ||
+      tableNm === 'dw_milking_report_all__daily' ||
+      tableNm === 'dw_animals_extra'
     ) {
       procedureName = tableNm + '_SP';
     }
+    if (tableNm === 'dw_history') {
+      procedureName = 'sp_' + tableNm;
+    }
+    // if (tableNm === 'dw_device_alert') {
+    //   procedureName = 'sp_deivce_alert';
+    // }
 
     //SchemaInformation db에서 synch에서 가져온 table의 컬럼 이름들과 타입들을 가져온다.
     const tableColumns = await schemaConnection.execute(
@@ -106,9 +115,7 @@ const Main = async () => {
       `SELECT * FROM ${tableNm} WHERE ${tableKey} = ${tableColumns[0][0].COLUMN_NAME}`
     );
     // dw_breeding에 regDate 가 0000-00-00 00:00:00 이 들어오면 invalid Date가 반환되서 미리 now()로 수정
-    if (tableNm === 'dw_breeding') {
-      data[0][0] = { ...data[0][0], RegDate: 'now()' };
-    }
+
     //data에 값이 있는지 검사후 실행하도록 한다.
     //data에 있는 컬럼들의 값들을 valueString에 넣어주되 타입에 맞게 value를 수정해준다
     try {
@@ -116,15 +123,19 @@ const Main = async () => {
       //procedure에 넣을 value(매개변수)들의 순서맞춤.
       if (tableNm === 'dw_animals') {
         valuesString = await spDwAnimals(valuesString);
+      } else if (tableNm === 'dw_device_config') {
+        valuesString = await spDeviceConfig(valuesString);
       } else if (tableNm === 'dw_history') {
         valuesString = await spDwHistory(valuesString);
       } else if (tableNm === 'dw_feed_move') {
         valuesString = await spDwFeedMove(valuesString);
       } else if (tableNm === 'dw_feed_move_robot') {
         valuesString = await spDwFeedMoveRobot(valuesString);
-      } else if (tableNm === 'dw_indoor') {
-        valuesString = await spDwIndoor(valuesString);
-      } else if (tableNm === 'dw_milking') {
+      }
+      // else if (tableNm === 'dw_indoor') {
+      //   valuesString = await spDwIndoor(valuesString);
+      // }
+      else if (tableNm === 'dw_milking') {
         valuesString = await spDwMilking(valuesString);
       } else if (tableNm === 'dw_water') {
         valuesString = await spDwWater(valuesString);
@@ -134,12 +145,14 @@ const Main = async () => {
 
       //매개변수들을 string으로 변환 후 프로시져를 호출한다.
       let joinedValuesString = valuesString.join(', ');
+      console.log('joined', joinedValuesString);
       if (tableNm === 'dw_milking_do_info') {
         await dx_9999Connection.execute(
           `INSERT INTO dw_milking_do_info values(${joinedValuesString})`
         );
         return;
       }
+      console.log('procedureName', procedureName);
       await dx_9999Connection.execute(
         `CALL ${procedureName}(${joinedValuesString})`
       );
@@ -169,9 +182,7 @@ const Main = async () => {
       `SELECT * FROM ${tableNm} WHERE ${tableKey} = ${tableColumns[0][0].COLUMN_NAME}`
     );
     // dw_breeding에 regDate 가 0000-00-00 00:00:00 이 들어오면 invalid Date가 반환되서 미리 now()로 수정
-    if (tableNm === 'dw_breeding') {
-      data[0][0] = { ...data[0][0], RegDate: 'now()' };
-    }
+
     //data에 값이 있는지 검사후 실행하도록 한다.
     //data에 있는 컬럼들의 값들을 valueString에 넣어주되 타입에 맞게 value를 수정해준다
     try {
@@ -193,27 +204,27 @@ const Main = async () => {
   };
 
   // where tableNm = "dw_device_config"
-
-  (async () => {
+  const inputData = async () => {
     while (true) {
       //1 synch에서 데이터를 가져온다.
       const [synchRows] = await localConnection.execute(
         'SELECT * FROM dw_synch where tableNm = "dw_milking_do_info" LIMIT 1'
       );
+
       console.log('synchRows.length', synchRows.length);
 
       for (let item of synchRows) {
         //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
         //DX 서버에 넣어주는 함수
-        await callProcedureDX(item.tableNm, item.tableKey1);
+        // await callProcedureDX(item.tableNm, item.tableKey1);
         //DW 서버에 넣어주는 함수
         await callProcedureDW(item.tableNm, item.tableKey1);
 
-        //Synch를 각 db에 넣은 후 해당 데이터 삭제
+        // Synch를 각 db에 넣은 후 해당 데이터 삭제
         // await localConnection.execute(
         //   `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
         // );
-        //가져온 데이터를 Synch_Backup에 추가
+        // // 가져온 데이터를 Synch_Backup에 추가
         // await localConnection.execute(
         //   `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
         // );
@@ -224,7 +235,40 @@ const Main = async () => {
         break;
       }
     }
-  })();
+  };
+  setTimeout(inputData, 1);
 };
 
 Main();
+
+// (async () => {
+//   while (true) {
+//     //1 synch에서 데이터를 가져온다.
+//     const [synchRows] = await localConnection.execute(
+//       'SELECT * FROM dw_synch LIMIT 1'
+//     );
+//     console.log('synchRows.length', synchRows.length);
+
+//     for (let item of synchRows) {
+//       //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
+//       //DX 서버에 넣어주는 함수
+//       await callProcedureDX(item.tableNm, item.tableKey1);
+//       //DW 서버에 넣어주는 함수
+//       await callProcedureDW(item.tableNm, item.tableKey1);
+
+//       //Synch를 각 db에 넣은 후 해당 데이터 삭제
+//       // await localConnection.execute(
+//       //   `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
+//       // );
+//       //가져온 데이터를 Synch_Backup에 추가
+//       // await localConnection.execute(
+//       //   `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
+//       // );
+//     }
+//     //이 조건문은 잘못되었다. 계속 돌아가기 때문에 후에 추가된 값들로 이뤄져 값이 적을 때가 있을텐데 그때마다 중단이 되버린다.
+//     if (synchRows.length < 100) {
+//       console.log('모든 작업을 마쳤습니다.');
+//       break;
+//     }
+//   }
+// })()

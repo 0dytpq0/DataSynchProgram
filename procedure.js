@@ -6,6 +6,12 @@ const spDwAnimals = (data) => {
   animalsArr.push(output);
   return animalsArr;
 };
+const spDeviceConfig = (data) => {
+  const devSeq = data[0];
+  const devArr = data.splice(1);
+  devArr.push(devSeq);
+  return devArr;
+};
 const spDwHistory = (data) => {
   return data.splice(1);
 };
@@ -70,4 +76,5 @@ module.exports = {
   spDwWater,
   spClDwFeedMoverRobot,
   spDwBreeding,
+  spDeviceConfig,
 };

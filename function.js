@@ -17,10 +17,23 @@ const getValuesString = async (columnNames, columnTypes, data) => {
     valuesString = await Promise.all(
       columnNames.map(async (name) => {
         let value = data[0][0][name];
+        console.log('value', value);
+        if (name === 'RegDate' || name === 'regDate') {
+          value = 'now()';
+          return value;
+        }
+        if (name === 'issueDate' && value === null) {
+          value = 'now()';
+          return value;
+        }
         if (columnTypes.includes(name)) {
           value = Number(value);
+          return value;
         }
-
+        if (value === null) {
+          value = ' ';
+          return value;
+        }
         if (typeof value === 'string') {
           return `'${value}'`;
         } else if (value instanceof Date) {
@@ -62,6 +75,9 @@ const getColumnNames = (columns, table, isDw) => {
   table !== 'dw_breeding' &&
   table !== 'dw_smslog' &&
   table !== 'dw_milking_do_info' &&
+  table !== 'dw_animals_extra' &&
+  table !== 'dw_biu' &&
+  table !== 'dw_milking_report_all__daily' &&
   isDw === 'no'
     ? (filteredColumns = columns.filter(
         (column) =>
@@ -74,6 +90,16 @@ const getColumnNames = (columns, table, isDw) => {
     filteredColumns = filteredColumns.filter(
       (column) =>
         column.COLUMN_NAME !== 'buyCost' && column.COLUMN_NAME !== 'aniType'
+    );
+  }
+  if (table === 'dw_animals_extra') {
+    filteredColumns = filteredColumns.filter(
+      (column) => column.COLUMN_NAME !== 'updateFlag'
+    );
+  }
+  if (table === 'dw_biu') {
+    filteredColumns = filteredColumns.filter(
+      (column) => column.COLUMN_NAME !== 'calc'
     );
   }
   if (table === 'dw_breeding' && isDw === 'yes') {
@@ -121,7 +147,7 @@ const getColumnNames = (columns, table, isDw) => {
     filteredColumns = filteredColumns.filter(
       (column) =>
         column.COLUMN_NAME !== 'indld' &&
-        column.COLUMN_NAME !== 'now' &&
+        // column.COLUMN_NAME !== 'now' &&
         column.COLUMN_NAME !== 'updateFlag'
     );
   }
