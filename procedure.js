@@ -31,7 +31,6 @@ const spClDwFeedMoverRobot = async (data) => {
   const moveRobotArrBack = data.splice(-4);
   const moveRobotArrFront = data.splice(0, 16);
   moveRobotArrFront.push(...moveRobotArrBack);
-  // const result = moveRobotArrFront + ',' + moveRobotArrBack;
   return moveRobotArrFront;
 };
 const spDwIndoor = (data) => {
@@ -56,6 +55,10 @@ const spDwWater = (data) => {
   waterArr.push(aniRFID);
   return waterArr;
 };
+const spDwBreeding = (data) => {
+  data.splice(20, 1, 'now()');
+  return data;
+};
 
 module.exports = {
   spDwAnimals,
@@ -66,4 +69,5 @@ module.exports = {
   spDwMilking,
   spDwWater,
   spClDwFeedMoverRobot,
+  spDwBreeding,
 };

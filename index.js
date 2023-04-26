@@ -2,7 +2,11 @@ const mysql = require('mysql2/promise');
 const moment = require('moment-timezone');
 const { filter } = require('jszip');
 const dbOriginData = require('./dbData');
-const { getColumnType, getColumnNames } = require('./function');
+const {
+  getColumnType,
+  getColumnNames,
+  getValuesString,
+} = require('./function');
 const {
   spDwAnimals,
   spDwHistory,
@@ -12,8 +16,10 @@ const {
   spDwMilking,
   spDwWater,
   spClDwFeedMoverRobot,
+  spDwBreeding,
 } = require('./procedure');
 
+//Sql서버에 접속하는 함수
 connectToMysql = async ({ host, user, password, database }) => {
   try {
     const connection = await mysql.createConnection({
@@ -56,7 +62,10 @@ const Main = async () => {
     password: 'ekdnsel',
     database: 'information_schema',
   });
+
+  //Dx서버에 데이터 동기화 시키는 함수.
   const callProcedureDX = async (tableNm, tableKey) => {
+    //procedure의 이름을 테이블에 따라 설정해준다.
     let procedureName = 'sp_' + tableNm.slice(3);
     if (tableNm === 'dw_daily_feed_robot') {
       procedureName = 'sp_' + tableNm.slice(3, -5) + 'Robot';
@@ -66,11 +75,7 @@ const Main = async () => {
       tableNm === 'dw_breeding' ||
       tableNm === 'dw_biu' ||
       tableNm === 'dw_smslog' ||
-      tableNm === 'dw_rumination'
-    ) {
-      procedureName = tableNm + '_SP';
-    }
-    if (
+      tableNm === 'dw_rumination' ||
       tableNm === 'dw_milking_report1' ||
       tableNm === 'dw_milking_report2' ||
       tableNm === 'dw_milking_report3' ||
@@ -83,40 +88,32 @@ const Main = async () => {
       procedureName = tableNm + '_SP';
     }
 
-    let procedureNameDw = 'sp_cl_' + tableNm.slice(3);
-    //moveSeq를 어떤 변수를 넣어야 될까?
-
+    //SchemaInformation db에서 synch에서 가져온 table의 컬럼 이름들과 타입들을 가져온다.
     const tableColumns = await schemaConnection.execute(
       `SELECT COLUMN_NAME,DATA_TYPE FROM COLUMNS WHERE TABLE_NAME='${tableNm}' and table_schema='dawoon' ORDER BY ordinal_position ASC;`
     );
-    //dx_9999 columnNames 구함
+
+    //위에서 가져온 이름들중에 procedure에서 사용하는 매개변수에 맞게 삭제할 것들은 삭제하며 맞춰주다.
     const columnNames = await getColumnNames(tableColumns[0], tableNm, 'no');
 
+    //decimal타입이 String타입으로 들어와서 varchar,datetime이 아닌 값들을 columnTypes에 배열로 할당해준다.
+    //아래에서 Types에 값이 있다면 Number로 설정해줄 것이다.
     const columnTypes = await getColumnType(tableColumns[0]);
 
+    //synch에서 가져온 synchSeq와 해당 synch의 테이블이름과 같은 테이블의 seq를 비교하여
+    //서로 같은 값이 있다면 data로 할당한다.
     const data = await localConnection.execute(
       `SELECT * FROM ${tableNm} WHERE ${tableKey} = ${tableColumns[0][0].COLUMN_NAME}`
     );
-    let valuesString;
+    // dw_breeding에 regDate 가 0000-00-00 00:00:00 이 들어오면 invalid Date가 반환되서 미리 now()로 수정
+    if (tableNm === 'dw_breeding') {
+      data[0][0] = { ...data[0][0], RegDate: 'now()' };
+    }
+    //data에 값이 있는지 검사후 실행하도록 한다.
+    //data에 있는 컬럼들의 값들을 valueString에 넣어주되 타입에 맞게 value를 수정해준다
     try {
-      valuesString = await Promise.all(
-        columnNames.map(async (name) => {
-          let value = data[0][0][name];
-          if (columnTypes.includes(name)) {
-            value = Number(value);
-          }
-
-          if (typeof value === 'string') {
-            return `'${value}'`;
-          } else if (value instanceof Date) {
-            return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
-          } else {
-            return value;
-          }
-        })
-      );
-
-      //procedure에 넣을 params 순서맞춤.
+      let valuesString = await getValuesString(columnNames, columnTypes, data);
+      //procedure에 넣을 value(매개변수)들의 순서맞춤.
       if (tableNm === 'dw_animals') {
         valuesString = await spDwAnimals(valuesString);
       } else if (tableNm === 'dw_history') {
@@ -131,9 +128,18 @@ const Main = async () => {
         valuesString = await spDwMilking(valuesString);
       } else if (tableNm === 'dw_water') {
         valuesString = await spDwWater(valuesString);
+      } else if (tableNm === 'dw_breeding') {
+        valuesString = await spDwBreeding(valuesString);
       }
 
+      //매개변수들을 string으로 변환 후 프로시져를 호출한다.
       let joinedValuesString = valuesString.join(', ');
+      if (tableNm === 'dw_milking_do_info') {
+        await dx_9999Connection.execute(
+          `INSERT INTO dw_milking_do_info values(${joinedValuesString})`
+        );
+        return;
+      }
       await dx_9999Connection.execute(
         `CALL ${procedureName}(${joinedValuesString})`
       );
@@ -142,47 +148,42 @@ const Main = async () => {
     }
   };
   const callProcedureDW = async (tableNm, tableKey) => {
+    //procedure의 이름을 테이블에 따라 설정해준다.
     let procedureName = 'sp_cl_' + tableNm.slice(3);
-    //moveSeq를 어떤 변수를 넣어야 될까?
 
+    //SchemaInformation db에서 synch에서 가져온 table의 컬럼 이름들과 타입들을 가져온다.
     const tableColumns = await schemaConnection.execute(
       `SELECT COLUMN_NAME,DATA_TYPE FROM COLUMNS WHERE TABLE_NAME='${tableNm}' and table_schema='dawoon' ORDER BY ordinal_position ASC;`
     );
-    //dx_9999 columnNames 구함
+
+    //위에서 가져온 이름들중에 procedure에서 사용하는 매개변수에 맞게 삭제할 것들은 삭제하며 맞춰주다.
     const columnNames = await getColumnNames(tableColumns[0], tableNm, 'yes');
+
+    //decimal타입이 String타입으로 들어와서 varchar,datetime이 아닌 값들을 columnTypes에 배열로 할당해준다.
+    //아래에서 Types에 값이 있다면 Number로 설정해줄 것이다.
     const columnTypes = await getColumnType(tableColumns[0]);
+
+    //synch에서 가져온 synchSeq와 해당 synch의 테이블이름과 같은 테이블의 seq를 비교하여
+    //서로 같은 값이 있다면 data로 할당한다.
     const data = await localConnection.execute(
       `SELECT * FROM ${tableNm} WHERE ${tableKey} = ${tableColumns[0][0].COLUMN_NAME}`
     );
-
-    let valuesString;
+    // dw_breeding에 regDate 가 0000-00-00 00:00:00 이 들어오면 invalid Date가 반환되서 미리 now()로 수정
+    if (tableNm === 'dw_breeding') {
+      data[0][0] = { ...data[0][0], RegDate: 'now()' };
+    }
+    //data에 값이 있는지 검사후 실행하도록 한다.
+    //data에 있는 컬럼들의 값들을 valueString에 넣어주되 타입에 맞게 value를 수정해준다
     try {
-      valuesString = await Promise.all(
-        columnNames.map(async (name) => {
-          let value = data[0][0][name];
+      let valuesString = await getValuesString(columnNames, columnTypes, data);
 
-          if (columnTypes.includes(name)) {
-            value = Number(value);
-          }
-
-          if (typeof value === 'string') {
-            return `'${value}'`;
-          } else if (value instanceof Date) {
-            return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
-          } else {
-            return value;
-          }
-        })
-      );
-
-      //procedure에 넣을 params 순서맞춤.
+      //procedure에 넣을 value(매개변수)들의 순서맞춤.
       if (tableNm === 'dw_feed_move_robot') {
         valuesString = await spClDwFeedMoverRobot(valuesString);
         procedureName = 'sp_cl_feed_move';
       }
-
+      //매개변수들을 string으로 변환 후 프로시져를 호출한다.
       let joinedValuesString = valuesString.join(', ');
-      //dw_3974에 넣을 columnNames 구함 3번째 params가 그에 관한 것임
       await dw_3974Connection.execute(
         `CALL ${procedureName}(${joinedValuesString})`
       );
@@ -192,10 +193,10 @@ const Main = async () => {
   };
 
   // where tableNm = "dw_device_config"
-  //synch 데이터를 가져옵니다.
-  //1 synch에서 데이터를 가져온다.
+
   (async () => {
     while (true) {
+      //1 synch에서 데이터를 가져온다.
       const [synchRows] = await localConnection.execute(
         'SELECT * FROM dw_synch where tableNm = "dw_milking_do_info" LIMIT 1'
       );
@@ -203,21 +204,21 @@ const Main = async () => {
 
       for (let item of synchRows) {
         //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
+        //DX 서버에 넣어주는 함수
         await callProcedureDX(item.tableNm, item.tableKey1);
+        //DW 서버에 넣어주는 함수
         await callProcedureDW(item.tableNm, item.tableKey1);
+
+        //Synch를 각 db에 넣은 후 해당 데이터 삭제
         // await localConnection.execute(
         //   `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
         // );
+        //가져온 데이터를 Synch_Backup에 추가
         // await localConnection.execute(
         //   `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
         // );
-
-        // await localConnection.execute(
-        //   `CALL sp_Synch('${item.tableNm}','${item.tableKey1}','${item.tableKey2}','${item.applyFlag}','${item.checkFlag}',${item.synchSeq}
-        //   )`
-        // );
       }
-
+      //이 조건문은 잘못되었다. 계속 돌아가기 때문에 후에 추가된 값들로 이뤄져 값이 적을 때가 있을텐데 그때마다 중단이 되버린다.
       if (synchRows.length < 100) {
         console.log('모든 작업을 마쳤습니다.');
         break;

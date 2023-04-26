@@ -1,3 +1,4 @@
+const { invalid } = require('moment');
 const { connectToMysql } = require('./index');
 const {
   spDwAnimals,
@@ -10,7 +11,30 @@ const {
   spClDwFeedMoverRobot,
 } = require('./procedure');
 const mysql = require('mysql2/promise');
+const getValuesString = async (columnNames, columnTypes, data) => {
+  let valuesString;
+  try {
+    valuesString = await Promise.all(
+      columnNames.map(async (name) => {
+        let value = data[0][0][name];
+        if (columnTypes.includes(name)) {
+          value = Number(value);
+        }
 
+        if (typeof value === 'string') {
+          return `'${value}'`;
+        } else if (value instanceof Date) {
+          return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
+        } else {
+          return value;
+        }
+      })
+    );
+  } catch (error) {
+    console.log('error', error);
+  }
+  return valuesString;
+};
 const getColumnType = (columns) => {
   let columnType = [];
   columnType = columns.filter(
@@ -223,4 +247,4 @@ const getColumnNames = (columns, table, isDw) => {
   return filteredColumns;
 };
 
-module.exports = { getColumnType, getColumnNames };
+module.exports = { getColumnType, getColumnNames, getValuesString };
