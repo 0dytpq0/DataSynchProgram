@@ -36,6 +36,8 @@ const getColumnNames = (columns, table, isDw) => {
   table !== 'dw_milking_report8' &&
   table !== 'dw_milking_report9' &&
   table !== 'dw_breeding' &&
+  table !== 'dw_smslog' &&
+  table !== 'dw_milking_do_info' &&
   isDw === 'no'
     ? (filteredColumns = columns.filter(
         (column) =>
@@ -50,7 +52,16 @@ const getColumnNames = (columns, table, isDw) => {
         column.COLUMN_NAME !== 'buyCost' && column.COLUMN_NAME !== 'aniType'
     );
   }
-  if (table === 'dw_feed_move') {
+  if (table === 'dw_breeding' && isDw === 'yes') {
+    filteredColumns = filteredColumns.filter(
+      (column) =>
+        column.COLUMN_NAME !== 'srcMCd' &&
+        column.COLUMN_NAME !== 'srcFCd' &&
+        column.COLUMN_NAME !== 'aniPregCheckDate' &&
+        column.COLUMN_NAME !== 'aniLowMilkDate'
+    );
+  }
+  if (table === 'dw_feed_move' && isDw === 'no') {
     filteredColumns = filteredColumns.filter(
       (column) =>
         column.COLUMN_NAME !== 'aniSeq' &&
@@ -91,15 +102,26 @@ const getColumnNames = (columns, table, isDw) => {
     );
   }
   if (table === 'dw_milking_daily') {
-    filteredColumns = filteredColumns.filter(
-      (column) =>
-        column.COLUMN_NAME !== 'dailySeq' &&
-        column.COLUMN_NAME !== 'yieldP' &&
-        column.COLUMN_NAME !== 'yieldE' &&
-        column.COLUMN_NAME !== 'fatE' &&
-        column.COLUMN_NAME !== 'proteinE' &&
-        column.COLUMN_NAME !== 'lactoseE'
-    );
+    if (isDw === 'no') {
+      filteredColumns = filteredColumns.filter(
+        (column) =>
+          column.COLUMN_NAME !== 'dailySeq' &&
+          column.COLUMN_NAME !== 'yieldP' &&
+          column.COLUMN_NAME !== 'yieldE' &&
+          column.COLUMN_NAME !== 'fatE' &&
+          column.COLUMN_NAME !== 'proteinE' &&
+          column.COLUMN_NAME !== 'lactoseE'
+      );
+    } else {
+      filteredColumns = filteredColumns.filter(
+        (column) =>
+          column.COLUMN_NAME !== 'yieldP' &&
+          column.COLUMN_NAME !== 'yieldE' &&
+          column.COLUMN_NAME !== 'fatE' &&
+          column.COLUMN_NAME !== 'proteinE' &&
+          column.COLUMN_NAME !== 'lactoseE'
+      );
+    }
   }
   if (table === 'dw_milking_daily_div') {
     filteredColumns = filteredColumns.filter(
@@ -113,16 +135,28 @@ const getColumnNames = (columns, table, isDw) => {
     );
   }
   if (table === 'dw_milking_do') {
-    filteredColumns = filteredColumns.filter(
-      (column) =>
-        column.COLUMN_NAME !== 'doSeq' &&
-        column.COLUMN_NAME !== 'yieldP' &&
-        column.COLUMN_NAME !== 'MilkingTeat' &&
-        column.COLUMN_NAME !== 'fatE' &&
-        column.COLUMN_NAME !== 'lactoseE'
-    );
+    if (isDw === 'no') {
+      filteredColumns = filteredColumns.filter(
+        (column) =>
+          column.COLUMN_NAME !== 'doSeq' &&
+          column.COLUMN_NAME !== 'yieldP' &&
+          column.COLUMN_NAME !== 'MilkingTeat' &&
+          column.COLUMN_NAME !== 'fatE' &&
+          column.COLUMN_NAME !== 'proteinE' &&
+          column.COLUMN_NAME !== 'lactoseE'
+      );
+    } else {
+      filteredColumns = filteredColumns.filter(
+        (column) =>
+          column.COLUMN_NAME !== 'yieldP' &&
+          column.COLUMN_NAME !== 'MilkingTeat' &&
+          column.COLUMN_NAME !== 'fatE' &&
+          column.COLUMN_NAME !== 'proteinE' &&
+          column.COLUMN_NAME !== 'lactoseE'
+      );
+    }
   }
-  if (table === 'dw_milking_do_div') {
+  if (table === 'dw_milking_do_div' && isDw === 'no') {
     filteredColumns = filteredColumns.filter(
       (column) =>
         column.COLUMN_NAME === 'milkDoSeq' || column.COLUMN_NAME == 'issueID'
@@ -134,13 +168,15 @@ const getColumnNames = (columns, table, isDw) => {
     );
   }
   if (table === 'dw_milking_do_info') {
-    filteredColumns = filteredColumns.filter(
-      (column) =>
-        column.COLUMN_NAME !== 'milkDoSeq' &&
-        column.COLUMN_NAME !== 'milkCellE' &&
-        column.COLUMN_NAME !== 'weight' &&
-        column.COLUMN_NAME !== 'sampleNo'
-    );
+    if (isDw === 'yes') {
+      filteredColumns = filteredColumns.filter(
+        (column) =>
+          column.COLUMN_NAME !== 'milkCell' &&
+          column.COLUMN_NAME !== 'milkCellE' &&
+          column.COLUMN_NAME !== 'weight' &&
+          column.COLUMN_NAME !== 'sampleNo'
+      );
+    }
   }
   if (table === 'dw_milking_report2') {
     filteredColumns = filteredColumns.filter(

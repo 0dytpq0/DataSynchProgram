@@ -1,9 +1,9 @@
 const spDwAnimals = (data) => {
   const aniSeq = data[0];
   const animalsArr = data.splice(1);
-  const output = 'Insert OK';
+  const output = '@returnOK';
   animalsArr.push(aniSeq);
-  animalsArr.push(`'${output}'`);
+  animalsArr.push(output);
   return animalsArr;
 };
 const spDwHistory = (data) => {
@@ -32,7 +32,6 @@ const spClDwFeedMoverRobot = async (data) => {
   const moveRobotArrFront = data.splice(0, 16);
   moveRobotArrFront.push(...moveRobotArrBack);
   // const result = moveRobotArrFront + ',' + moveRobotArrBack;
-  console.log('moveRobotArrFront', moveRobotArrFront);
   return moveRobotArrFront;
 };
 const spDwIndoor = (data) => {

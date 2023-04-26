@@ -29,7 +29,7 @@ connectToMysql = async ({ host, user, password, database }) => {
     throw error;
   }
 };
-module.exports = connectToMysql;
+// module.exports = connectToMysql;
 
 const Main = async () => {
   const localConnection = await connectToMysql({
@@ -65,7 +65,7 @@ const Main = async () => {
       tableNm === 'dw_milking_feed' ||
       tableNm === 'dw_breeding' ||
       tableNm === 'dw_biu' ||
-      tableNm === 'dw_smslog_SP' ||
+      tableNm === 'dw_smslog' ||
       tableNm === 'dw_rumination'
     ) {
       procedureName = tableNm + '_SP';
@@ -97,8 +97,6 @@ const Main = async () => {
     const data = await localConnection.execute(
       `SELECT * FROM ${tableNm} WHERE ${tableKey} = ${tableColumns[0][0].COLUMN_NAME}`
     );
-    console.log('data[0]', tableKey, tableColumns[0][0].COLUMN_NAME);
-
     let valuesString;
     try {
       valuesString = await Promise.all(
@@ -111,7 +109,7 @@ const Main = async () => {
           if (typeof value === 'string') {
             return `'${value}'`;
           } else if (value instanceof Date) {
-            return `'${value.toISOString().slice(0, 19).replace('T', '')}'`;
+            return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
           } else {
             return value;
           }
@@ -140,7 +138,7 @@ const Main = async () => {
         `CALL ${procedureName}(${joinedValuesString})`
       );
     } catch (error) {
-      console.log('error', error);
+      console.log('error', error, tableNm);
     }
   };
   const callProcedureDW = async (tableNm, tableKey) => {
@@ -156,11 +154,13 @@ const Main = async () => {
     const data = await localConnection.execute(
       `SELECT * FROM ${tableNm} WHERE ${tableKey} = ${tableColumns[0][0].COLUMN_NAME}`
     );
+
     let valuesString;
     try {
       valuesString = await Promise.all(
         columnNames.map(async (name) => {
           let value = data[0][0][name];
+
           if (columnTypes.includes(name)) {
             value = Number(value);
           }
@@ -187,38 +187,43 @@ const Main = async () => {
         `CALL ${procedureName}(${joinedValuesString})`
       );
     } catch (error) {
-      console.log('error', error);
+      console.log('error', error, tableNm);
     }
   };
 
   // where tableNm = "dw_device_config"
   //synch 데이터를 가져옵니다.
   //1 synch에서 데이터를 가져온다.
-  while (true) {
-    const [synchRows] = await localConnection.execute(
-      'SELECT * FROM dw_synch where tableNm = "dw_animals" LIMIT 3'
-    );
-    console.log('synchRows.length', synchRows.length);
+  (async () => {
+    while (true) {
+      const [synchRows] = await localConnection.execute(
+        'SELECT * FROM dw_synch where tableNm = "dw_milking_do_info" LIMIT 1'
+      );
+      console.log('synchRows.length', synchRows.length);
 
-    for (let item of synchRows) {
-      //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
-      callProcedureDX(item.tableNm, item.tableKey1);
-      // callProcedureDW(item.tableNm, item.tableKey1);
-      // await localConnection.execute(
-      //   `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
-      // );
-      // await localConnection.execute('DELETE FROM dw_synch LIMIT 100 ');
+      for (let item of synchRows) {
+        //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
+        await callProcedureDX(item.tableNm, item.tableKey1);
+        await callProcedureDW(item.tableNm, item.tableKey1);
+        // await localConnection.execute(
+        //   `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
+        // );
+        // await localConnection.execute(
+        //   `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
+        // );
 
-      // await localConnection.execute(
-      //   `CALL sp_Synch('${item.tableNm}','${item.tableKey1}','${item.tableKey2}','${item.applyFlag}','${item.checkFlag}',${item.synchSeq}
-      //   )`
-      // );
+        // await localConnection.execute(
+        //   `CALL sp_Synch('${item.tableNm}','${item.tableKey1}','${item.tableKey2}','${item.applyFlag}','${item.checkFlag}',${item.synchSeq}
+        //   )`
+        // );
+      }
+
+      if (synchRows.length < 100) {
+        console.log('모든 작업을 마쳤습니다.');
+        break;
+      }
     }
-    if (synchRows.length < 100) {
-      console.log('모든 작업을 마쳤습니다.');
-      break;
-    }
-  }
+  })();
 };
 
 Main();
