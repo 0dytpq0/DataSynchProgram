@@ -216,13 +216,13 @@ const Main = async () => {
           await callProcedureDW(item.tableNm, item.tableKey1);
 
           // Synch를 각 db에 넣은 후 해당 데이터 삭제
-          // await localConnection.execute(
-          //   `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
-          // );
-          // // 가져온 데이터를 Synch_Backup에 추가
-          // await localConnection.execute(
-          //   `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
-          // );
+          await localConnection.execute(
+            `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
+          );
+          // 가져온 데이터를 Synch_Backup에 추가
+          await localConnection.execute(
+            `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
+          );
         }
         //이 조건문은 잘못되었다. 계속 돌아가기 때문에 후에 추가된 값들로 이뤄져 값이 적을 때가 있을텐데 그때마다 중단이 되버린다.
         if (synchRows.length < 100) {
