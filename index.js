@@ -28,7 +28,6 @@ connectToMysql = async ({ host, user, password, database }) => {
       password,
       database,
     });
-    console.log(`Connected to MySQL db at ${host}`);
     return connection;
   } catch (error) {
     console.log(`Connecting to MySQL db at ${host}Error`);
@@ -44,18 +43,7 @@ const Main = async () => {
     password: 'ekdnsel',
     database: 'dawoon',
   });
-  const dx_9999Connection = await connectToMysql({
-    host: 'localhost',
-    user: 'root',
-    password: 'ekdnsel',
-    database: 'dx_9999',
-  });
-  const dw_3974Connection = await connectToMysql({
-    host: 'localhost',
-    user: 'root',
-    password: 'ekdnsel',
-    database: 'dw_3974',
-  });
+
   const schemaConnection = await connectToMysql({
     host: 'localhost',
     user: 'root',
@@ -65,6 +53,12 @@ const Main = async () => {
 
   //Dx서버에 데이터 동기화 시키는 함수.
   const callProcedureDX = async (tableNm, tableKey) => {
+    const dx_9999Connection = await connectToMysql({
+      host: 'localhost',
+      user: 'root',
+      password: 'ekdnsel',
+      database: 'dx_9999',
+    });
     //procedure의 이름을 테이블에 따라 설정해준다.
     let procedureName = 'sp_' + tableNm.slice(3);
     if (tableNm === 'dw_daily_feed_robot') {
@@ -115,6 +109,8 @@ const Main = async () => {
 
     //data에 값이 있는지 검사후 실행하도록 한다.
     //data에 있는 컬럼들의 값들을 valueString에 넣어주되 타입에 맞게 value를 수정해준다
+    let resultSet;
+
     try {
       let valuesString = await getValuesString(columnNames, columnTypes, data);
       //procedure에 넣을 value(매개변수)들의 순서맞춤.
@@ -152,9 +148,17 @@ const Main = async () => {
       );
     } catch (error) {
       console.log('error', error, tableNm);
+    } finally {
+      dx_9999Connection.end();
     }
   };
   const callProcedureDW = async (tableNm, tableKey) => {
+    const dw_3974Connection = await connectToMysql({
+      host: 'localhost',
+      user: 'root',
+      password: 'ekdnsel',
+      database: 'dw_3974',
+    });
     //procedure의 이름을 테이블에 따라 설정해준다.
     let procedureName = 'sp_cl_' + tableNm.slice(3);
 
@@ -179,6 +183,7 @@ const Main = async () => {
 
     //data에 값이 있는지 검사후 실행하도록 한다.
     //data에 있는 컬럼들의 값들을 valueString에 넣어주되 타입에 맞게 value를 수정해준다
+    let resultSet;
     try {
       let valuesString = await getValuesString(columnNames, columnTypes, data);
 
@@ -194,43 +199,47 @@ const Main = async () => {
       );
     } catch (error) {
       console.log('error', error, tableNm);
+    } finally {
+      dw_3974Connection.end();
     }
   };
 
   // where tableNm = "dw_device_config"
   const inputData = async () => {
     setTimeout(async () => {
-      while (true) {
+      let loop = true;
+      while (loop) {
         //1 synch에서 데이터를 가져온다.
         const [synchRows] = await localConnection.execute(
-          'SELECT * FROM dw_synch LIMIT 1'
+          'SELECT * FROM dw_synch LIMIT 100'
         );
 
         console.log('synchRows.length', synchRows.length);
 
-        for (let item of synchRows) {
-          //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
-          //DX 서버에 넣어주는 함수
-          await callProcedureDX(item.tableNm, item.tableKey1);
-          //DW 서버에 넣어주는 함수
-          await callProcedureDW(item.tableNm, item.tableKey1);
-
-          // Synch를 각 db에 넣은 후 해당 데이터 삭제
-          await localConnection.execute(
-            `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
-          );
-          // 가져온 데이터를 Synch_Backup에 추가
-          await localConnection.execute(
-            `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
-          );
-        }
-        //이 조건문은 잘못되었다. 계속 돌아가기 때문에 후에 추가된 값들로 이뤄져 값이 적을 때가 있을텐데 그때마다 중단이 되버린다.
-        if (synchRows.length < 100) {
+        //더이상 싱크에 값이 없으면 정지된다.
+        if (synchRows.length === 0) {
           console.log('모든 작업을 마쳤습니다.');
-          break;
+          loop = false;
+        } else {
+          for (let item of synchRows) {
+            //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
+            //DX 서버에 넣어주는 함수
+            await callProcedureDX(item.tableNm, item.tableKey1);
+            //DW 서버에 넣어주는 함수
+            await callProcedureDW(item.tableNm, item.tableKey1);
+
+            // Synch를 각 db에 넣은 후 해당 데이터 삭제
+            await localConnection.execute(
+              `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
+            );
+            // 가져온 데이터를 Synch_Backup에 추가
+            await localConnection.execute(
+              `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
+            );
+          }
         }
       }
-    }, 5000);
+    }, 1);
   };
   inputData();
 };
