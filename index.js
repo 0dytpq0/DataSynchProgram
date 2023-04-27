@@ -9,15 +9,14 @@ const {
 } = require('./function');
 const {
   spDwAnimals,
-  spDwHistory,
   spDwFeedMove,
   spDwFeedMoveRobot,
-  spDwIndoor,
-  spDwMilking,
   spDwWater,
   spClDwFeedMoverRobot,
   spDwBreeding,
   spDeviceConfig,
+  spDwDeviceAlert,
+  spDwMilkingSet,
 } = require('./procedure');
 
 //Sql서버에 접속하는 함수
@@ -72,31 +71,29 @@ const Main = async () => {
       procedureName = 'sp_' + tableNm.slice(3, -5) + 'Robot';
     }
     if (
-      tableNm === 'dw_milking_feed' ||
       tableNm === 'dw_breeding' ||
       tableNm === 'dw_biu' ||
       tableNm === 'dw_smslog' ||
-      tableNm === 'dw_rumination' ||
       tableNm === 'dw_milking_report1' ||
-      tableNm === 'dw_milking_report2' ||
-      tableNm === 'dw_milking_report3' ||
       tableNm === 'dw_milking_report4' ||
-      tableNm === 'dw_milking_report5' ||
-      tableNm === 'dw_milking_report6' ||
       tableNm === 'dw_milking_report8' ||
-      tableNm === 'dw_milking_report9' ||
       tableNm === 'dw_milking_report_all__daily' ||
       tableNm === 'dw_animals_extra'
     ) {
       procedureName = tableNm + '_SP';
     }
-    if (tableNm === 'dw_history') {
-      procedureName = 'sp_' + tableNm;
+    if (tableNm === 'dw_device_alert') {
+      procedureName = 'sp_deivce_alert';
     }
-    // if (tableNm === 'dw_device_alert') {
-    //   procedureName = 'sp_deivce_alert';
-    // }
-
+    if (tableNm === 'dw_milkingsets') {
+      procedureName = 'dw_milkingsetsROBOT_Insert_SP';
+    }
+    if (tableNm === 'dw_milking_report_all') {
+      procedureName = 'dw_milking_report_all_SPX';
+    }
+    if (tableNm === 'log_animals') {
+      procedureName = 'sp_log_animals';
+    }
     //SchemaInformation db에서 synch에서 가져온 table의 컬럼 이름들과 타입들을 가져온다.
     const tableColumns = await schemaConnection.execute(
       `SELECT COLUMN_NAME,DATA_TYPE FROM COLUMNS WHERE TABLE_NAME='${tableNm}' and table_schema='dawoon' ORDER BY ordinal_position ASC;`
@@ -123,36 +120,33 @@ const Main = async () => {
       //procedure에 넣을 value(매개변수)들의 순서맞춤.
       if (tableNm === 'dw_animals') {
         valuesString = await spDwAnimals(valuesString);
+      } else if (tableNm === 'dw_device_alert') {
+        valuesString = await spDwDeviceAlert(valuesString);
       } else if (tableNm === 'dw_device_config') {
         valuesString = await spDeviceConfig(valuesString);
-      } else if (tableNm === 'dw_history') {
-        valuesString = await spDwHistory(valuesString);
       } else if (tableNm === 'dw_feed_move') {
         valuesString = await spDwFeedMove(valuesString);
       } else if (tableNm === 'dw_feed_move_robot') {
         valuesString = await spDwFeedMoveRobot(valuesString);
-      }
-      // else if (tableNm === 'dw_indoor') {
-      //   valuesString = await spDwIndoor(valuesString);
-      // }
-      else if (tableNm === 'dw_milking') {
-        valuesString = await spDwMilking(valuesString);
       } else if (tableNm === 'dw_water') {
         valuesString = await spDwWater(valuesString);
       } else if (tableNm === 'dw_breeding') {
         valuesString = await spDwBreeding(valuesString);
+      } else if (tableNm === 'dw_milkingsets') {
+        valuesString = await spDwMilkingSet(valuesString);
       }
-
       //매개변수들을 string으로 변환 후 프로시져를 호출한다.
       let joinedValuesString = valuesString.join(', ');
-      console.log('joined', joinedValuesString);
       if (tableNm === 'dw_milking_do_info') {
         await dx_9999Connection.execute(
           `INSERT INTO dw_milking_do_info values(${joinedValuesString})`
         );
         return;
+      } else if (tableNm === 'dw_water2') {
+        await dx_9999Connection.execute(
+          `INSERT INTO dw_water2 values(${joinedValuesString})`
+        );
       }
-      console.log('procedureName', procedureName);
       await dx_9999Connection.execute(
         `CALL ${procedureName}(${joinedValuesString})`
       );
@@ -205,38 +199,40 @@ const Main = async () => {
 
   // where tableNm = "dw_device_config"
   const inputData = async () => {
-    while (true) {
-      //1 synch에서 데이터를 가져온다.
-      const [synchRows] = await localConnection.execute(
-        'SELECT * FROM dw_synch where tableNm = "dw_milking_do_info" LIMIT 1'
-      );
+    setTimeout(async () => {
+      while (true) {
+        //1 synch에서 데이터를 가져온다.
+        const [synchRows] = await localConnection.execute(
+          'SELECT * FROM dw_synch LIMIT 1'
+        );
 
-      console.log('synchRows.length', synchRows.length);
+        console.log('synchRows.length', synchRows.length);
 
-      for (let item of synchRows) {
-        //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
-        //DX 서버에 넣어주는 함수
-        // await callProcedureDX(item.tableNm, item.tableKey1);
-        //DW 서버에 넣어주는 함수
-        await callProcedureDW(item.tableNm, item.tableKey1);
+        for (let item of synchRows) {
+          //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
+          //DX 서버에 넣어주는 함수
+          await callProcedureDX(item.tableNm, item.tableKey1);
+          //DW 서버에 넣어주는 함수
+          await callProcedureDW(item.tableNm, item.tableKey1);
 
-        // Synch를 각 db에 넣은 후 해당 데이터 삭제
-        // await localConnection.execute(
-        //   `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
-        // );
-        // // 가져온 데이터를 Synch_Backup에 추가
-        // await localConnection.execute(
-        //   `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
-        // );
+          // Synch를 각 db에 넣은 후 해당 데이터 삭제
+          // await localConnection.execute(
+          //   `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
+          // );
+          // // 가져온 데이터를 Synch_Backup에 추가
+          // await localConnection.execute(
+          //   `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
+          // );
+        }
+        //이 조건문은 잘못되었다. 계속 돌아가기 때문에 후에 추가된 값들로 이뤄져 값이 적을 때가 있을텐데 그때마다 중단이 되버린다.
+        if (synchRows.length < 100) {
+          console.log('모든 작업을 마쳤습니다.');
+          break;
+        }
       }
-      //이 조건문은 잘못되었다. 계속 돌아가기 때문에 후에 추가된 값들로 이뤄져 값이 적을 때가 있을텐데 그때마다 중단이 되버린다.
-      if (synchRows.length < 100) {
-        console.log('모든 작업을 마쳤습니다.');
-        break;
-      }
-    }
+    }, 5000);
   };
-  setTimeout(inputData, 1);
+  inputData();
 };
 
 Main();

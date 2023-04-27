@@ -7,19 +7,25 @@ const spDwAnimals = (data) => {
   return animalsArr;
 };
 const spDeviceConfig = (data) => {
-  const devSeq = data[0];
   const devArr = data.splice(1);
-  devArr.push(devSeq);
+  devArr.push(0);
   return devArr;
 };
-const spDwHistory = (data) => {
-  return data.splice(1);
-};
+
 const spDwFeedMove = (data) => {
   const moveSeq = data[0];
   const feedMoveArr = data.splice(1);
   feedMoveArr.push(moveSeq);
   return feedMoveArr;
+};
+const spDwMilkingSet = async (data) => {
+  const milkingCheckTime1 = data[66];
+  const milkingCheckTime2 = data[65];
+  console.log(data[66]);
+  const milkingSetArr = data;
+  milkingSetArr.splice(65, 1, milkingCheckTime1);
+  milkingSetArr.splice(66, 1, milkingCheckTime2);
+  return milkingSetArr;
 };
 const spDwFeedMoveRobot = async (data) => {
   const moveSeq = data[0];
@@ -39,20 +45,6 @@ const spClDwFeedMoverRobot = async (data) => {
   moveRobotArrFront.push(...moveRobotArrBack);
   return moveRobotArrFront;
 };
-const spDwIndoor = (data) => {
-  const cmd = data[0];
-  let indoorArr = data.splice(2);
-  indoorArr.push('now()');
-  indoorArr.push(cmd);
-
-  return indoorArr;
-};
-const spDwMilking = (data) => {
-  const milkSeq = data[0];
-  let milkingArr = data.splice(1);
-  milkingArr.push(milkSeq);
-  return milkingArr;
-};
 const spDwWater = (data) => {
   const aniSeq = data[0];
   const aniRFID = data[1];
@@ -65,16 +57,21 @@ const spDwBreeding = (data) => {
   data.splice(20, 1, 'now()');
   return data;
 };
-
+const spDwDeviceAlert = (data) => {
+  const alertArr = data.splice(1);
+  alertArr.push(0);
+  alertArr.splice(2, 0, 'now()');
+  console.log(alertArr);
+  return alertArr;
+};
 module.exports = {
   spDwAnimals,
-  spDwHistory,
   spDwFeedMove,
   spDwFeedMoveRobot,
-  spDwIndoor,
-  spDwMilking,
   spDwWater,
   spClDwFeedMoverRobot,
   spDwBreeding,
   spDeviceConfig,
+  spDwDeviceAlert,
+  spDwMilkingSet,
 };

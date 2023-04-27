@@ -17,12 +17,11 @@ const getValuesString = async (columnNames, columnTypes, data) => {
     valuesString = await Promise.all(
       columnNames.map(async (name) => {
         let value = data[0][0][name];
-        console.log('value', value);
         if (name === 'RegDate' || name === 'regDate') {
           value = 'now()';
           return value;
         }
-        if (name === 'issueDate' && value === null) {
+        if (name === 'issueDate' || name === 'IssueDate') {
           value = 'now()';
           return value;
         }
@@ -52,7 +51,9 @@ const getColumnType = (columns) => {
   let columnType = [];
   columnType = columns.filter(
     (column) =>
-      column.DATA_TYPE !== 'varchar' && column.DATA_TYPE !== 'datetime'
+      column.DATA_TYPE !== 'varchar' &&
+      column.DATA_TYPE !== 'datetime' &&
+      column.DATA_TYPE !== 'longtext'
   );
   columnType = columnType.map((column) => column.COLUMN_NAME);
   return columnType;
@@ -62,27 +63,25 @@ const getColumnNames = (columns, table, isDw) => {
   let filteredColumns;
   table !== 'dw_manager' &&
   table !== 'dw_milking_config' &&
-  table !== 'dw_milking_feed' &&
   table !== 'dw_milking_memo' &&
   table !== 'dw_milking_report1' &&
-  table !== 'dw_milking_report2' &&
-  table !== 'dw_milking_report3' &&
   table !== 'dw_milking_report4' &&
-  table !== 'dw_milking_report5' &&
-  table !== 'dw_milking_report6' &&
   table !== 'dw_milking_report8' &&
-  table !== 'dw_milking_report9' &&
   table !== 'dw_breeding' &&
   table !== 'dw_smslog' &&
   table !== 'dw_milking_do_info' &&
   table !== 'dw_animals_extra' &&
   table !== 'dw_biu' &&
   table !== 'dw_milking_report_all__daily' &&
+  table !== 'dw_milking_report_all' &&
+  table !== 'dw_water2' &&
   isDw === 'no'
     ? (filteredColumns = columns.filter(
         (column) =>
           column.COLUMN_NAME !== 'regDate' &&
+          column.COLUMN_NAME !== 'RegDate' &&
           column.COLUMN_NAME !== 'issueDate' &&
+          column.COLUMN_NAME !== 'IssueDate' &&
           column.COLUMN_NAME !== 'feedSeq'
       ))
     : (filteredColumns = columns);
@@ -143,12 +142,17 @@ const getColumnNames = (columns, table, isDw) => {
       );
     }
   }
-  if (table === 'dw_indoor') {
+  if (table === 'dw_milkingsets') {
     filteredColumns = filteredColumns.filter(
       (column) =>
-        column.COLUMN_NAME !== 'indld' &&
-        // column.COLUMN_NAME !== 'now' &&
-        column.COLUMN_NAME !== 'updateFlag'
+        column.COLUMN_NAME !== 'MilkingSeq' &&
+        column.COLUMN_NAME !== 'aniOwnerNo' &&
+        column.COLUMN_NAME !== 'inBoxTime' &&
+        column.COLUMN_NAME !== 'milkCell' &&
+        column.COLUMN_NAME !== 'weight' &&
+        column.COLUMN_NAME !== 'sampleNo' &&
+        column.COLUMN_NAME !== 'irTagBatLevel' &&
+        column.COLUMN_NAME !== 'Milkingdate'
     );
   }
   if (table === 'dw_milking_daily') {
@@ -178,12 +182,7 @@ const getColumnNames = (columns, table, isDw) => {
       (column) => column.COLUMN_NAME !== 'dailyDivSeq'
     );
   }
-  if (table === 'dw_milking_div') {
-    filteredColumns = filteredColumns.filter(
-      (column) =>
-        column.COLUMN_NAME === 'milkDoSeq' || column.COLUMN_NAME == 'issueID'
-    );
-  }
+
   if (table === 'dw_milking_do') {
     if (isDw === 'no') {
       filteredColumns = filteredColumns.filter(
@@ -267,6 +266,12 @@ const getColumnNames = (columns, table, isDw) => {
   if (table === 'dw_water') {
     filteredColumns = filteredColumns.filter(
       (column) => column.COLUMN_NAME !== 'waterSeq'
+    );
+  }
+  if (table === 'log_animals') {
+    filteredColumns = filteredColumns.filter(
+      (column) =>
+        column.COLUMN_NAME === 'aniSeq' || column.COLUMN_NAME === 'issueID'
     );
   }
   filteredColumns = filteredColumns.map((column) => column.COLUMN_NAME);
