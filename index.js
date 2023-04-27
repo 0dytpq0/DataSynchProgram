@@ -52,13 +52,7 @@ const Main = async () => {
   });
 
   //Dx서버에 데이터 동기화 시키는 함수.
-  const callProcedureDX = async (tableNm, tableKey) => {
-    const dx_9999Connection = await connectToMysql({
-      host: 'localhost',
-      user: 'root',
-      password: 'ekdnsel',
-      database: 'dx_9999',
-    });
+  const callProcedureDX = async (tableNm, tableKey, connection) => {
     //procedure의 이름을 테이블에 따라 설정해준다.
     let procedureName = 'sp_' + tableNm.slice(3);
     if (tableNm === 'dw_daily_feed_robot') {
@@ -134,31 +128,21 @@ const Main = async () => {
       //매개변수들을 string으로 변환 후 프로시져를 호출한다.
       let joinedValuesString = valuesString.join(', ');
       if (tableNm === 'dw_milking_do_info') {
-        await dx_9999Connection.execute(
+        await connection.execute(
           `INSERT INTO dw_milking_do_info values(${joinedValuesString})`
         );
         return;
       } else if (tableNm === 'dw_water2') {
-        await dx_9999Connection.execute(
+        await connection.execute(
           `INSERT INTO dw_water2 values(${joinedValuesString})`
         );
       }
-      await dx_9999Connection.execute(
-        `CALL ${procedureName}(${joinedValuesString})`
-      );
+      await connection.execute(`CALL ${procedureName}(${joinedValuesString})`);
     } catch (error) {
       console.log('error', error, tableNm);
-    } finally {
-      dx_9999Connection.end();
     }
   };
-  const callProcedureDW = async (tableNm, tableKey) => {
-    const dw_3974Connection = await connectToMysql({
-      host: 'localhost',
-      user: 'root',
-      password: 'ekdnsel',
-      database: 'dw_3974',
-    });
+  const callProcedureDW = async (tableNm, tableKey, connection) => {
     //procedure의 이름을 테이블에 따라 설정해준다.
     let procedureName = 'sp_cl_' + tableNm.slice(3);
 
@@ -194,13 +178,9 @@ const Main = async () => {
       }
       //매개변수들을 string으로 변환 후 프로시져를 호출한다.
       let joinedValuesString = valuesString.join(', ');
-      await dw_3974Connection.execute(
-        `CALL ${procedureName}(${joinedValuesString})`
-      );
+      await connection.execute(`CALL ${procedureName}(${joinedValuesString})`);
     } catch (error) {
       console.log('error', error, tableNm);
-    } finally {
-      dw_3974Connection.end();
     }
   };
 
@@ -209,6 +189,18 @@ const Main = async () => {
     setTimeout(async () => {
       let loop = true;
       while (loop) {
+        const dw_3974Connection = await connectToMysql({
+          host: 'localhost',
+          user: 'root',
+          password: 'ekdnsel',
+          database: 'dw_3974',
+        });
+        const dx_9999Connection = await connectToMysql({
+          host: 'localhost',
+          user: 'root',
+          password: 'ekdnsel',
+          database: 'dx_9999',
+        });
         //1 synch에서 데이터를 가져온다.
         const [synchRows] = await localConnection.execute(
           'SELECT * FROM dw_synch LIMIT 100'
@@ -224,9 +216,17 @@ const Main = async () => {
           for (let item of synchRows) {
             //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
             //DX 서버에 넣어주는 함수
-            await callProcedureDX(item.tableNm, item.tableKey1);
+            await callProcedureDX(
+              item.tableNm,
+              item.tableKey1,
+              dx_9999Connection
+            );
             //DW 서버에 넣어주는 함수
-            await callProcedureDW(item.tableNm, item.tableKey1);
+            await callProcedureDW(
+              item.tableNm,
+              item.tableKey1,
+              dw_3974Connection
+            );
 
             // Synch를 각 db에 넣은 후 해당 데이터 삭제
             await localConnection.execute(
@@ -238,6 +238,8 @@ const Main = async () => {
             );
           }
         }
+        await dw_3974Connection.end();
+        await dx_9999Connection.end();
       }
     }, 1);
   };
