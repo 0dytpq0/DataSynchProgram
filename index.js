@@ -6,6 +6,7 @@ const {
   getColumnType,
   getColumnNames,
   getValuesString,
+  reFormDate,
 } = require('./function');
 const {
   spDwAnimals,
@@ -103,7 +104,6 @@ const Main = async () => {
 
     //data에 값이 있는지 검사후 실행하도록 한다.
     //data에 있는 컬럼들의 값들을 valueString에 넣어주되 타입에 맞게 value를 수정해준다
-    let resultSet;
 
     try {
       let valuesString = await getValuesString(columnNames, columnTypes, data);
@@ -216,11 +216,13 @@ const Main = async () => {
           for (let item of synchRows) {
             //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
             //DX 서버에 넣어주는 함수
+            console.log('item.tableKey1', item.tableKey1);
             await callProcedureDX(
               item.tableNm,
               item.tableKey1,
               dx_9999Connection
             );
+
             //DW 서버에 넣어주는 함수
             await callProcedureDW(
               item.tableNm,
@@ -229,13 +231,19 @@ const Main = async () => {
             );
 
             // Synch를 각 db에 넣은 후 해당 데이터 삭제
-            await localConnection.execute(
-              `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
-            );
-            // 가져온 데이터를 Synch_Backup에 추가
-            await localConnection.execute(
-              `INSERT INTO dw_synch_backup values(${item.synchSeq},'${item.tableNm}','${item.tableKey1}','${item.tableKey2}',now(),'${item.applyFlag}',${item.applyDate},'${item.checkFlag}',${item.checkDate})`
-            );
+            // await localConnection.execute(
+            //   `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
+            // );
+            // // 가져온 데이터를 Synch_Backup에 추가
+            // await localConnection.execute(
+            //   `INSERT INTO dw_synch_backup values(${item.synchSeq},'${
+            //     item.tableNm
+            //   }','${item.tableKey1}','${item.tableKey2}',now(),'${
+            //     item.applyFlag
+            //   }',${reFormDate(item.applyDate)},'${item.checkFlag}',${reFormDate(
+            //     item.checkDate
+            //   )})`
+            // );
           }
         }
         await dw_3974Connection.end();

@@ -17,13 +17,19 @@ const getValuesString = async (columnNames, columnTypes, data) => {
     valuesString = await Promise.all(
       columnNames.map(async (name) => {
         let value = data[0][0][name];
+        console.log('value', value);
+        // now()로 넣으니 dw만? 000000 나옴
         if (name === 'RegDate' || name === 'regDate') {
           value = 'now()';
-          return value;
         }
         if (name === 'issueDate' || name === 'IssueDate') {
           value = 'now()';
-          return value;
+        }
+        if (name === 'milkingDt' && value === null) {
+          value = 'now()';
+        }
+        if (name === 'aniExMemo' && value === null) {
+          value = '';
         }
         if (columnTypes.includes(name)) {
           value = Number(value);
@@ -33,7 +39,7 @@ const getValuesString = async (columnNames, columnTypes, data) => {
           value = ' ';
           return value;
         }
-        if (typeof value === 'string') {
+        if (typeof value === 'string' && value !== 'now()') {
           return `'${value}'`;
         } else if (value instanceof Date) {
           return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
@@ -46,6 +52,11 @@ const getValuesString = async (columnNames, columnTypes, data) => {
     console.log('error', error);
   }
   return valuesString;
+};
+const reFormDate = (value) => {
+  if (value !== null && value !== '') {
+    return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
+  }
 };
 const getColumnType = (columns) => {
   let columnType = [];
@@ -278,4 +289,4 @@ const getColumnNames = (columns, table, isDw) => {
   return filteredColumns;
 };
 
-module.exports = { getColumnType, getColumnNames, getValuesString };
+module.exports = { getColumnType, getColumnNames, getValuesString, reFormDate };
