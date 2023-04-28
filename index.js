@@ -111,7 +111,11 @@ const Main = async () => {
       console.log('valuesString' + tableNm, valuesString);
       //procedure에 넣을 value(매개변수)들의 순서맞춤.
       if (tableNm === 'dw_animals') {
-        valuesString = await spDwAnimals(valuesString);
+        const existAniSeq = await connection.execute(
+          `SELECT aniSeq FROM dw_animals WHERE aniSeq = ${tableKey}`
+        );
+        console.log('existAniSeq', existAniSeq[0][0]);
+        valuesString = await spDwAnimals(valuesString, existAniSeq[0][0]);
       } else if (tableNm === 'dw_device_alert') {
         valuesString = await spDwDeviceAlert(valuesString);
       } else if (tableNm === 'dw_device_config') {
@@ -139,6 +143,7 @@ const Main = async () => {
           `INSERT INTO dw_water2 values(${joinedValuesString})`
         );
       }
+      console.log(`CALL ${procedureName}(${joinedValuesString})`);
       await connection.execute(`CALL ${procedureName}(${joinedValuesString})`);
     } catch (error) {
       console.log('error', error, tableNm);
@@ -217,7 +222,6 @@ const Main = async () => {
           for (let item of synchRows) {
             //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
             //DX 서버에 넣어주는 함수
-            console.log('item.tableKey1', item.tableNm);
             await callProcedureDX(
               item.tableNm,
               item.tableKey1,

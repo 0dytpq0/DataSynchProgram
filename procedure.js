@@ -1,5 +1,7 @@
-const spDwAnimals = (data) => {
-  const aniSeq = data[0];
+const spDwAnimals = (data, seq) => {
+  let aniSeq;
+  seq === undefined ? (aniSeq = 0) : (aniSeq = data[0]);
+
   const animalsArr = data.splice(1);
   const output = '@returnOK';
   animalsArr.push(aniSeq);
@@ -21,7 +23,6 @@ const spDwFeedMove = (data) => {
 const spDwMilkingSet = async (data) => {
   const milkingCheckTime1 = data[66];
   const milkingCheckTime2 = data[65];
-  console.log(data[66]);
   const milkingSetArr = data;
   milkingSetArr.splice(65, 1, milkingCheckTime1);
   milkingSetArr.splice(66, 1, milkingCheckTime2);
@@ -61,7 +62,6 @@ const spDwDeviceAlert = (data) => {
   const alertArr = data.splice(1);
   alertArr.push(0);
   alertArr.splice(2, 0, 'now()');
-  console.log(alertArr);
   return alertArr;
 };
 module.exports = {

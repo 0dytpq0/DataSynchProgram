@@ -17,7 +17,6 @@ const getValuesString = async (columnNames, columnTypes, data) => {
     valuesString = await Promise.all(
       columnNames.map(async (name) => {
         let value = data[0][0][name];
-        console.log('value', value);
         // now()로 넣으니 dw만? 000000 나옴
         if (name === 'RegDate' || name === 'regDate') {
           value = 'now()';
@@ -54,7 +53,6 @@ const getValuesString = async (columnNames, columnTypes, data) => {
   return valuesString;
 };
 const reFormDate = (value) => {
-  console.log(value);
   if (value !== null && value !== '') {
     return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
   }
