@@ -90,6 +90,7 @@ const Main = async () => {
 
     //위에서 가져온 이름들중에 procedure에서 사용하는 매개변수에 맞게 삭제할 것들은 삭제하며 맞춰주다.
     const columnNames = await getColumnNames(tableColumns[0], tableNm, 'no');
+    console.log('columnNames' + tableNm, columnNames);
 
     //decimal타입이 String타입으로 들어와서 varchar,datetime이 아닌 값들을 columnTypes에 배열로 할당해준다.
     //아래에서 Types에 값이 있다면 Number로 설정해줄 것이다.
@@ -107,6 +108,7 @@ const Main = async () => {
 
     try {
       let valuesString = await getValuesString(columnNames, columnTypes, data);
+      console.log('valuesString' + tableNm, valuesString);
       //procedure에 넣을 value(매개변수)들의 순서맞춤.
       if (tableNm === 'dw_animals') {
         valuesString = await spDwAnimals(valuesString);
@@ -167,7 +169,6 @@ const Main = async () => {
 
     //data에 값이 있는지 검사후 실행하도록 한다.
     //data에 있는 컬럼들의 값들을 valueString에 넣어주되 타입에 맞게 value를 수정해준다
-    let resultSet;
     try {
       let valuesString = await getValuesString(columnNames, columnTypes, data);
 
@@ -216,7 +217,7 @@ const Main = async () => {
           for (let item of synchRows) {
             //여기서 함수가 실행이 되어야된다.(table 이름에 따른 함수)
             //DX 서버에 넣어주는 함수
-            console.log('item.tableKey1', item.tableKey1);
+            console.log('item.tableKey1', item.tableNm);
             await callProcedureDX(
               item.tableNm,
               item.tableKey1,
@@ -248,6 +249,7 @@ const Main = async () => {
         }
         await dw_3974Connection.end();
         await dx_9999Connection.end();
+        break;
       }
     }, 1);
   };

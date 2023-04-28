@@ -54,9 +54,11 @@ const getValuesString = async (columnNames, columnTypes, data) => {
   return valuesString;
 };
 const reFormDate = (value) => {
+  console.log(value);
   if (value !== null && value !== '') {
     return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
   }
+  return value;
 };
 const getColumnType = (columns) => {
   let columnType = [];
@@ -121,14 +123,17 @@ const getColumnNames = (columns, table, isDw) => {
         column.COLUMN_NAME !== 'aniLowMilkDate'
     );
   }
-  if (table === 'dw_feed_move' && isDw === 'no') {
-    filteredColumns = filteredColumns.filter(
-      (column) =>
-        column.COLUMN_NAME !== 'aniSeq' &&
-        column.COLUMN_NAME !== 'stdTime' &&
-        column.COLUMN_NAME !== 'feedCd'
-    );
+  if (table === 'dw_feed_move') {
+    if (isDw === 'no') {
+      filteredColumns = filteredColumns.filter(
+        (column) =>
+          column.COLUMN_NAME !== 'aniSeq' &&
+          column.COLUMN_NAME !== 'stdTime' &&
+          column.COLUMN_NAME !== 'feedCd'
+      );
+    }
   }
+
   if (table === 'dw_feed_move_robot') {
     if (isDw === 'yes') {
       filteredColumns = filteredColumns.filter(
