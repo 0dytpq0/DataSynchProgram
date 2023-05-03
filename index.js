@@ -253,7 +253,6 @@ const Main = async () => {
         }
         await dw_3974Connection.end();
         await dx_9999Connection.end();
-        break;
       }
     }, 1);
   };
@@ -262,6 +261,9 @@ const Main = async () => {
 
 Main();
 
+schedule.scheduleJob('0 12 * * *', async () => {
+  Main();
+});
 // (async () => {
 //   while (true) {
 //     //1 synch에서 데이터를 가져온다.
