@@ -236,19 +236,19 @@ const Main = async () => {
             );
 
             // Synch를 각 db에 넣은 후 해당 데이터 삭제
-            // await localConnection.execute(
-            //   `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
-            // );
-            // // 가져온 데이터를 Synch_Backup에 추가
-            // await localConnection.execute(
-            //   `INSERT INTO dw_synch_backup values(${item.synchSeq},'${
-            //     item.tableNm
-            //   }','${item.tableKey1}','${item.tableKey2}',now(),'${
-            //     item.applyFlag
-            //   }',${reFormDate(item.applyDate)},'${item.checkFlag}',${reFormDate(
-            //     item.checkDate
-            //   )})`
-            // );
+            await localConnection.execute(
+              `DELETE FROM dw_synch where synchSeq = ${item.synchSeq}`
+            );
+            // 가져온 데이터를 Synch_Backup에 추가
+            await localConnection.execute(
+              `INSERT INTO dw_synch_backup values(${item.synchSeq},'${
+                item.tableNm
+              }','${item.tableKey1}','${item.tableKey2}',now(),'${
+                item.applyFlag
+              }',${reFormDate(item.applyDate)},'${item.checkFlag}',${reFormDate(
+                item.checkDate
+              )})`
+            );
           }
         }
         await dw_3974Connection.end();
