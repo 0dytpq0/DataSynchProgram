@@ -41,15 +41,15 @@ const Main = async () => {
   const localConnection = await connectToMysql({
     host: 'localhost',
     user: 'root',
-    password: 'ekdnsel',
-    database: 'dawoon',
+    password: '',
+    database: '',
   });
 
   const schemaConnection = await connectToMysql({
     host: 'localhost',
     user: 'root',
-    password: 'ekdnsel',
-    database: 'information_schema',
+    password: '',
+    database: '',
   });
 
   //Dx서버에 데이터 동기화 시키는 함수.
@@ -198,14 +198,14 @@ const Main = async () => {
         const dw_3974Connection = await connectToMysql({
           host: 'localhost',
           user: 'root',
-          password: 'ekdnsel',
-          database: 'dw_3974',
+          password: '',
+          database: '',
         });
         const dx_9999Connection = await connectToMysql({
           host: 'localhost',
           user: 'root',
-          password: 'ekdnsel',
-          database: 'dx_9999',
+          password: '',
+          database: '',
         });
         //1 synch에서 데이터를 가져온다.
         const [synchRows] = await localConnection.execute(
